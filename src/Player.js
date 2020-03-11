@@ -1,82 +1,113 @@
-class Player
+import { Loader, Sprite, Ticker } from 'pixi.js'
+import RocketManager from './RocketManager';
+
+export default class Player extends Sprite
 {
-    constructor()
-    {
-        this.sprite = new PIXI.Sprite(PIXI.loader.resources["assets/spaceship.png"].texture);
+  constructor(stage) {
+    // Set spaceship texture
+    super(Loader.shared.resources["assets/spaceship.png"].texture);
 
-        this.sprite.anchor.set(0.5, 0.5);
-        this.sprite.position.set(renderer.width * 0.2, renderer.height * 0.4);
-        this.sprite.scale.set(0.4, 0.4);
+    // Set the stage param in this object
+    this.stage = stage;
 
-        this.keyState = {32: false, 37: false, 38: false, 39: false, 40: false};
-        this.keyCodes = {37: -1, 38: -1, 39: 1, 40: 1};
+    // Setup the sprite anchor, scale and position
+    this.anchor.set(0.5, 0.5);
+    this.scale.set(0.33, 0.33);
+    this.position.set(window.innerWidth * 0.1, window.innerHeight * 0.4);
 
-        this.directionX = 0;
-        this.directionY = 0;
-        this.speed = 10;
+    // Add it to the stage container
+    stage.addChild(this);
 
-        this.fireSpeed = 10;
-        this.fireCooldown = 0;
+    // Current ship velocity
+    this.velocity = { x: 0, y: 0 };
 
-        stage.addChild(this.sprite);
+    // Ship speed
+    this.speed = 6;
 
-        window.addEventListener('keydown', this.onKeyDown.bind(this));
-        window.addEventListener('keyup', this.onKeyUp.bind(this));
+    // Contains the keys state (pressed / released)
+    this.keysState = { 32: false, 37: false, 38: false, 39: false, 40: false };
+
+    // Listen to keyboard events
+    window.addEventListener('keydown', this.onKeyDown.bind(this));
+    window.addEventListener('keyup', this.onKeyUp.bind(this));
+
+    // Spaceship rocket manager
+    this.rocketManager = new RocketManager();
+
+    // Is fire delay over
+    this.canFire = true;
+
+    // Delay between 2 rockets fire (in miliseconds)
+    this.fireDelay = 500;
+  }
+
+  /**
+   * Occurs when key is pressed 
+   */
+  onKeyDown(key) {
+    const velocities = { 37: -1, 38: -1, 39: 1, 40: 1 };
+
+    this.keysState[key.keyCode] = true;
+
+    if (key.keyCode == 37 || key.keyCode == 39) {
+      this.velocity.x = velocities[key.keyCode];
+    } else if (key.keyCode == 38 || key.keyCode == 40) {
+      this.velocity.y = velocities[key.keyCode];
     }
+  }
 
-    update()
-    {
-        let nextX = this.sprite.position.x + this.directionX * this.speed;
-        let nextY = this.sprite.position.y + this.directionY * this.speed;
+  /**
+   * Occurs when key is released 
+   */
+  onKeyUp(key) {
+    this.keysState[key.keyCode] = false;
 
-        // Prevent from leaving the screen
-        if (nextX > 0 && nextX < renderer.width) {
-            this.sprite.position.x = nextX;
-        }
-        if (nextY > 0 && nextY < renderer.height) {
-            this.sprite.position.y = nextY;
-        }
-
-        this.updateFire();
+    if (key.keyCode == 37 || key.keyCode == 39) {
+      this.velocity.x = 0;
+    } else if (key.keyCode == 38 || key.keyCode == 40) {
+      this.velocity.y = 0;
     }
+  }
 
-    updateFire()
-    {
-        if (this.fireCooldown < this.fireSpeed)
-            this.fireCooldown++;
+  /**
+   * Update rocket firing
+   */
+  updateFiring() {
+    // If space bar is pressed and fire delay is over
+    if (this.keysState[32] && this.canFire) {
+      // Create new rocket (with x axis shift so it's popping in front of the ship)
+      this.rocketManager.createRocket(this.stage, {
+        x: this.position.x + this.width / 2,
+        y: this.position.y
+      });
 
-        if (this.keyState[32] && this.fireCooldown >= this.fireSpeed)
-        {
-            let rocket = new Rocket(this.sprite.position.x, this.sprite.position.y);
-            this.fireCooldown = 0;
-        }
+      // Reset delay needed to fire
+      this.resetFireDelay();
     }
+  }
 
-    onKeyDown(key)
-    {
-        this.keyState[key.keyCode] = true;
+  /**
+   * Called when player just fired (reset fire delay timer)
+   */
+  resetFireDelay() {
+    this.canFire = false;
 
-        if (key.keyCode == 37 || key.keyCode == 39)
-            this.directionX = this.keyCodes[key.keyCode];
-        else if (key.keyCode == 38 || key.keyCode == 40)
-            this.directionY = this.keyCodes[key.keyCode];
+    setTimeout(() => this.canFire = true, this.fireDelay);
+  }
+
+  update() {
+    this.updateFiring();
+    this.rocketManager.update();
+
+    let nextX = this.position.x + this.velocity.x * this.speed;
+    let nextY = this.position.y + this.velocity.y * this.speed;
+
+    // Prevent from leaving the screen
+    if (nextX > 0 && nextX < window.innerWidth) {
+        this.position.x = nextX;
     }
-
-    onKeyUp(key)
-    {
-        this.keyState[key.keyCode] = false;
-
-        if (!this.keyState[37] && this.keyState[39])
-            this.directionX = this.keyCodes[39];
-        else if (this.keyState[37] && !this.keyState[39])
-            this.directionX = this.keyCodes[37];
-        else this.directionX = 0;
-
-        if (!this.keyState[38] && this.keyState[40])
-            this.directionY = this.keyCodes[40];
-        else if (this.keyState[38] && !this.keyState[40])
-            this.directionY = this.keyCodes[38];
-        else this.directionY = 0;
+    if (nextY > 0 && nextY < window.innerHeight) {
+        this.position.y = nextY;
     }
-
+  }
 }
